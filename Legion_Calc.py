@@ -24,7 +24,7 @@ def dice_results(red_dice_in_pool=0, black_dice_in_pool=0, white_dice_in_pool=0)
 
 
 def dice_reroll(dice_result, red_dice_in_pool=0, black_dice_in_pool=0, white_dice_in_pool=0, precise=0,
-                surge_tokens=0, critical=0, surge=0, cover=0, sharpshooter=0, total_impact=0, armor=0):
+                surge_tokens=0, critical=0, surge=0, cover=0, sharpshooter=0, total_impact=0, armor=0, crit_fishing=False):
 
     red_dice = [[1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 0, 0]]
     black_dice = [[1, 0, 0], [1, 0, 0], [1, 0, 0], [0, 0, 0], [0, 0, 0], [0, 1, 0], [0, 0, 1], [0, 0, 0]]
@@ -48,8 +48,6 @@ def dice_reroll(dice_result, red_dice_in_pool=0, black_dice_in_pool=0, white_dic
         hits += side[0]
         crits += side[1]
         surges += side[2]
-
-    crit_fishing = False
 
     for die in dice_result[::-1]:
         if die == [0, 0, 0]:
@@ -123,7 +121,7 @@ def dice_reroll(dice_result, red_dice_in_pool=0, black_dice_in_pool=0, white_dic
 
 
 def dice_modifiers(dice_result, red_dice_in_pool=0, black_dice_in_pool=0, white_dice_in_pool=0, aim_tokens=0, precise=0,
-                   surge_tokens=0, critical=0, surge=0, cover=0, sharpshooter=0, total_impact=0, armor=0):
+                   surge_tokens=0, critical=0, surge=0, cover=0, sharpshooter=0, total_impact=0, armor=0, crit_fishing=False):
     """
     aim/precise
     marksman
@@ -148,7 +146,7 @@ def dice_modifiers(dice_result, red_dice_in_pool=0, black_dice_in_pool=0, white_
                         black_dice_in_pool=black_dice_in_pool,
                         white_dice_in_pool=white_dice_in_pool, precise=precise,
                         surge_tokens=surge_tokens, critical=critical, surge=surge, cover=cover,
-                        sharpshooter=sharpshooter, total_impact=total_impact, armor=armor)
+                        sharpshooter=sharpshooter, total_impact=total_impact, armor=armor, crit_fishing=crit_fishing)
 
     # marksman logic here, no idea what does
 
@@ -203,7 +201,7 @@ def dice_modifiers(dice_result, red_dice_in_pool=0, black_dice_in_pool=0, white_
 
 
 def defense_dice(dice_totals, def_dice_type, surge=0, surge_token=0, dodge_token=0, pierce=0, impervious=0,
-                 immune_pierce=0):
+                 immune_pierce=0, high_velocity=False, uncanny_luck=0, outmaneuver=False, danger_sense=0):
     # blocks
     # surges
     # pierce/impervious/immune:pierce
@@ -218,13 +216,17 @@ def defense_dice(dice_totals, def_dice_type, surge=0, surge_token=0, dodge_token
         print("Bad Defense Dice, try 'white' or 'red'!")
         return dice_totals
 
-    # dodge token stuff here
-    dice_totals[0] -= min(dice_totals[0], dodge_token)
+    # dodge token + high velocity stuff here
+    if not high_velocity:
+        if outmaneuver:
+            dice_totals[0] -= min((dice_totals[0]+dice_totals[1]), dodge_token)
+        else:
+            dice_totals[0] -= min(dice_totals[0], dodge_token)
 
     temp_surge_token_pool = surge_token
     def_pool = []
 
-    for number in range(0, dice_totals[1] + dice_totals[0] + min(pierce, impervious)):
+    for number in range(0, dice_totals[1] + dice_totals[0] + min(pierce, impervious) + danger_sense):
         def_pool.append(random.choice(def_dice))
 
     blocks = 0
@@ -240,26 +242,27 @@ def defense_dice(dice_totals, def_dice_type, surge=0, surge_token=0, dodge_token
     if pierce > 0 and immune_pierce == 0:
         blocks = max(blocks - pierce, 0)
 
-    damage_totals = dice_totals[0] + dice_totals[1] - blocks
+    damage_totals = max(0, dice_totals[0] + dice_totals[1] - blocks)
 
     return damage_totals
 
 
 """
 Mod Array
-[aim tokens, precise, surge tokens #, critical x, surge(0 - none, 1- hits, 2- crits), cover(0-none, 1-light, 2-heavy), 
-sharpshooter x, impact x + weak points, armor(0 none, #-amount, 99-all)]
+[aim tokens, precise, surge tokens #, critical x, surge(0 - none, 1- hits, 2- crits), 
+cover(0-none, 1-light, 2-heavy, 3-super_low_profile), 
+sharpshooter x, impact x + weak points, armor(0 none, #-amount, 99-all), crit_fishing]
 
 def mods
-[surge(0 - none, 1 - block), surge token #, dodge token, pierce, impervious, immune:pierce]
+[surge(0 - none, 1 - block), surge token #, dodge token, pierce, impervious, immune:pierce, high_velocity, 
+uncanny_luck, outmaneuver, danger_sense]
 """
 
+# TODO:
 # Import from file row
 # Export To file
-# High Velocity
-# Han's Reroll
-# Outmanouver
-# Crit Fishing
+# Uncanny Luck
+# Guardian
 
 start = datetime.now()
 red_dice_in_pool = 0
@@ -273,10 +276,10 @@ for simulation in range(0, 100000):
     test_atk_mods = dice_modifiers(test_roll, red_dice_in_pool=red_dice_in_pool, black_dice_in_pool=black_dice_in_pool,
                                    white_dice_in_pool=white_dice_in_pool, aim_tokens=2,
                                    precise=0, surge_tokens=0, critical=0, surge=0, cover=0, sharpshooter=0,
-                                   total_impact=0,
-                                   armor=0)
+                                   total_impact=0, armor=0, crit_fishing=False)
     test_def_roll = defense_dice(test_atk_mods, 'red', surge=0, surge_token=0, dodge_token=0, pierce=0, impervious=0,
-                                 immune_pierce=0)
+                                 immune_pierce=0, high_velocity=False, uncanny_luck=0,
+                                 outmaneuver=False, danger_sense=0)
     pdf[test_def_roll] += 1
 
 pdf_perc = pdf/sum(pdf)
