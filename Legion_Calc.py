@@ -200,8 +200,9 @@ def dice_modifiers(dice_result, red_dice_in_pool=0, black_dice_in_pool=0, white_
     return dice_totals
 
 
-def defense_dice(dice_totals, def_dice_type, surge=0, surge_token=0, dodge_token=0, pierce=0, impervious=0,
-                 immune_pierce=0, high_velocity=False, uncanny_luck=0, outmaneuver=False, danger_sense=0):
+def defense_dice(dice_totals, def_dice_type, surge=0, def_surge_token=0, dodge_token=0, pierce=0, impervious=0,
+                 immune_pierce=0, high_velocity=False, uncanny_luck=0, outmaneuver=False, danger_sense=0,
+                 guardian=0, protector=False):
     # blocks
     # surges
     # pierce/impervious/immune:pierce
@@ -223,7 +224,12 @@ def defense_dice(dice_totals, def_dice_type, surge=0, surge_token=0, dodge_token
         else:
             dice_totals[0] -= min(dice_totals[0], dodge_token)
 
-    temp_surge_token_pool = surge_token
+    if protector:
+        dice_totals[0] -= min((dice_totals[0]+dice_totals[1]), guardian)
+    else:
+        dice_totals[0] -= min(dice_totals[0], guardian)
+
+    temp_surge_token_pool = def_surge_token
     def_pool = []
 
     for number in range(0, dice_totals[1] + dice_totals[0] + min(pierce, impervious) + danger_sense):
@@ -247,39 +253,72 @@ def defense_dice(dice_totals, def_dice_type, surge=0, surge_token=0, dodge_token
     return damage_totals
 
 
-"""
-Mod Array
-[aim tokens, precise, surge tokens #, critical x, surge(0 - none, 1- hits, 2- crits), 
-cover(0-none, 1-light, 2-heavy, 3-super_low_profile), 
-sharpshooter x, impact x + weak points, armor(0 none, #-amount, 99-all), crit_fishing]
-
-def mods
-[surge(0 - none, 1 - block), surge token #, dodge token, pierce, impervious, immune:pierce, high_velocity, 
-uncanny_luck, outmaneuver, danger_sense]
-"""
-
 # TODO:
 # Import from file row
 # Export To file
 # Uncanny Luck
-# Guardian
 
 start = datetime.now()
+
+"""
+Set inputs below:
+Dice in pool
+Attack Mods
+Defense Mods
+"""
+
+# Set Attack Dice
 red_dice_in_pool = 0
 black_dice_in_pool = 6
 white_dice_in_pool = 2
+test_roll_params = [red_dice_in_pool, black_dice_in_pool, white_dice_in_pool]
+
+"""
+Set Attack Dice Mods
+[aim tokens, precise, surge tokens #, critical x, surge(0 - none, 1- hits, 2- crits), 
+cover(0-none, 1-light, 2-heavy, 3-super_low_profile), 
+sharpshooter x, impact x + weak points, armor(0 none, #-amount, 99-all), crit_fishing]
+"""
+aim_tokens = 2
+precise = 0
+surge_tokens = 0
+critical = 0
+surge = 0
+cover = 0
+sharpshooter = 0
+total_impact = 0
+armor = 0
+crit_fishing = False
+test_atk_mods_params = test_roll_params + [aim_tokens, precise, surge_tokens, critical, surge, cover, sharpshooter,
+                                           total_impact, armor, crit_fishing]
+"""
+def mods
+[surge(0 - none, 1 - block), surge token #, dodge token, pierce, impervious, immune:pierce, high_velocity, 
+uncanny_luck, outmaneuver, guardian=0, protector]
+"""
+# Set Def Dice Mods
+def_dice_type = 'red'
+surge = 0
+def_surge_token = 0
+dodge_token = 0
+pierce = 0
+impervious = 0
+immune_pierce = 0
+high_velocity = False
+uncanny_luck = 0
+outmaneuver = False
+danger_sense = 0
+guardian = 0
+protector = False
+def_roll_params = [def_dice_type, surge, def_surge_token, dodge_token, pierce, impervious, immune_pierce, high_velocity,
+                   uncanny_luck, outmaneuver, danger_sense, guardian, protector]
+
 pdf = np.zeros(red_dice_in_pool + black_dice_in_pool + white_dice_in_pool+1)
 
 for simulation in range(0, 100000):
-    test_roll = dice_results(red_dice_in_pool=red_dice_in_pool, black_dice_in_pool=black_dice_in_pool,
-                             white_dice_in_pool=white_dice_in_pool)
-    test_atk_mods = dice_modifiers(test_roll, red_dice_in_pool=red_dice_in_pool, black_dice_in_pool=black_dice_in_pool,
-                                   white_dice_in_pool=white_dice_in_pool, aim_tokens=2,
-                                   precise=0, surge_tokens=0, critical=0, surge=0, cover=0, sharpshooter=0,
-                                   total_impact=0, armor=0, crit_fishing=False)
-    test_def_roll = defense_dice(test_atk_mods, 'red', surge=0, surge_token=0, dodge_token=0, pierce=0, impervious=0,
-                                 immune_pierce=0, high_velocity=False, uncanny_luck=0,
-                                 outmaneuver=False, danger_sense=0)
+    test_roll = dice_results(*test_roll_params)
+    test_atk_mods = dice_modifiers(test_roll, *test_atk_mods_params)
+    test_def_roll = defense_dice(test_atk_mods, *def_roll_params)
     pdf[test_def_roll] += 1
 
 pdf_perc = pdf/sum(pdf)
@@ -301,9 +340,9 @@ for i in pdf_perc[::-1]:
 
 cdf = cdf[::-1]
 
-output_header[1] = '{0:.2f}'.format(ev)
-output_header[0] = 'name of roll' #make into params at some point
+output_header = test_atk_mods_params+def_roll_params
 print(output_header)
+print('{0:.2f}'.format(ev))
 print(output)
 print(cdf)
 print("done:" + str(datetime.now()-start))
